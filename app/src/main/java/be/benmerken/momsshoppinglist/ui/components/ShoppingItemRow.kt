@@ -15,23 +15,35 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import be.benmerken.momsshoppinglist.data.model.ShoppingItem
 import be.benmerken.momsshoppinglist.ui.theme.MomsShoppingListTheme
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import be.benmerken.momsshoppinglist.R
 
 @Composable
 fun ShoppingItemRow(
     item: ShoppingItem,
     onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    dragHandleModifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!item.isChecked) }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Drag handle for reordering
+        Icon(
+            painter = painterResource(id = R.drawable.baseline_drag_indicator_24),
+            contentDescription = "Reorder item",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = dragHandleModifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+
         Checkbox(
             checked = item.isChecked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = onCheckedChange
         )
         Text(
             text = item.name,
@@ -44,7 +56,7 @@ fun ShoppingItemRow(
             },
             modifier = Modifier
                 .weight(1f)
-                .padding(start = 16.dp)
+                .padding(start = 12.dp)
         )
     }
 }
@@ -55,17 +67,6 @@ fun ShoppingItemRowPreview() {
     MomsShoppingListTheme {
         ShoppingItemRow(
             item = ShoppingItem(id = "1", name = "Whole Milk", isChecked = false),
-            onCheckedChange = {}
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ShoppingItemRowCheckedPreview() {
-    MomsShoppingListTheme {
-        ShoppingItemRow(
-            item = ShoppingItem(id = "2", name = "Whole Wheat Bread", isChecked = true),
             onCheckedChange = {}
         )
     }
