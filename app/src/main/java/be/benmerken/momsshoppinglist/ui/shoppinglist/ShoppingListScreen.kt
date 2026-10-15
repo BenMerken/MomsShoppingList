@@ -18,6 +18,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -38,12 +39,12 @@ fun ShoppingListScreen(
     var items by remember {
         mutableStateOf(
             listOf(
-                ShoppingItem("1", "Milk", false),
-                ShoppingItem("2", "Bread", false),
-                ShoppingItem("3", "Eggs", true),
-                ShoppingItem("4", "Butter", false),
-                ShoppingItem("5", "Apples", false),
-                ShoppingItem("6", "Coffee", true)
+                ShoppingItem("1", "Milk", false, 0),
+                ShoppingItem("2", "Bread", false, 1),
+                ShoppingItem("3", "Eggs", true, 2),
+                ShoppingItem("4", "Butter", false, 3),
+                ShoppingItem("5", "Apples", false, 4),
+                ShoppingItem("6", "Coffee", true, 5)
             )
         )
     }
@@ -85,10 +86,10 @@ fun ShoppingListScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 itemsIndexed(
-                    items = items,
+                    items = items.sortedBy { it.listOrder },
                     key = { _, item -> item.id }
                 ) { index, item ->
-                    var dragOffsetY by remember { mutableStateOf(0f) }
+                    var dragOffsetY by remember { mutableFloatStateOf(0f) }
 
                     ShoppingItemRow(
                         item = item,
@@ -119,7 +120,9 @@ fun ShoppingListScreen(
                                         val mutableList = items.toMutableList()
                                         val movedItem = mutableList.removeAt(index)
                                         mutableList.add(index + 1, movedItem)
-                                        items = mutableList
+                                        items = mutableList.mapIndexed { newIndex, itm ->
+                                            itm.copy(listOrder = newIndex)
+                                        }
                                         draggingIndex = index + 1
                                         dragOffsetY = 0f
                                     } else if (dragOffsetY < -itemHeightPx && index > 0) {
@@ -127,7 +130,9 @@ fun ShoppingListScreen(
                                         val mutableList = items.toMutableList()
                                         val movedItem = mutableList.removeAt(index)
                                         mutableList.add(index - 1, movedItem)
-                                        items = mutableList
+                                        items = mutableList.mapIndexed { newIndex, itm ->
+                                            itm.copy(listOrder = newIndex)
+                                        }
                                         draggingIndex = index - 1
                                         dragOffsetY = 0f
                                     }
