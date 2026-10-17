@@ -1,15 +1,10 @@
 package be.benmerken.momsshoppinglist.ui.shoppinglist
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -22,13 +17,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import be.benmerken.momsshoppinglist.data.model.ShoppingList
+import be.benmerken.momsshoppinglist.ui.components.ShoppingListCard
 import be.benmerken.momsshoppinglist.ui.theme.MomsShoppingListTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShoppingListsScreen(
-    onShoppingListClick: (ShoppingList) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onShoppingListClick: (ShoppingList) -> Unit = {}
 ) {
     val shoppingLists = listOf(
         ShoppingList("1", "Mom's Shopping List", "Groceries and household items"),
@@ -63,36 +59,10 @@ fun ShoppingListsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(shoppingLists) { list ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onShoppingListClick(list) },
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = list.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (list.description.isNotBlank()) {
-                            Text(
-                                text = list.description,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
-                    }
-                }
+                ShoppingListCard(
+                    onShoppingListClick = onShoppingListClick,
+                    list = list
+                )
             }
         }
     }
@@ -102,6 +72,6 @@ fun ShoppingListsScreen(
 @Composable
 fun ShoppingListsScreenPreview() {
     MomsShoppingListTheme {
-        ShoppingListsScreen(onShoppingListClick = {})
+        ShoppingListsScreen()
     }
 }
