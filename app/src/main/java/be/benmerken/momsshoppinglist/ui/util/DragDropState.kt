@@ -118,16 +118,18 @@ class DragDropState internal constructor(
     private val currentElement: LazyListItemInfo?
         get() = currentIndexOfDraggedItem?.let { state.getVisibleItemInfoFor(absoluteIndex = it) }
 
-    fun onDragStart(offset: Offset) {
+    fun onDragStartForIndex(index: Int) {
+        previousIndexOfDraggedItem = null
+        scope.launch {
+            previousItemOffset.snapTo(0f)
+        }
         state.layoutInfo.visibleItemsInfo
-            .firstOrNull { item ->
-                val pointerY = offset.y.toInt()
-                (pointerY >= item.offset) && (pointerY <= (item.offset + item.size))
-            }
+            .firstOrNull { it.index == index }
             ?.also {
                 currentIndexOfDraggedItem = it.index
                 initiallyDraggedElement = it
                 draggingItemInitialOffset = it.offset
+                draggedDistance = 0f
             }
     }
 
@@ -157,26 +159,24 @@ class DragDropState internal constructor(
             val endOffset = bottomOffset + draggedDistance
 
             currentElement?.let { hovered ->
-                state.layoutInfo.visibleItemsInfo
-                    .asSequence()
-                    .filterNot { item ->
-                        (item.offsetEnd < startOffset) || (item.offset > endOffset) || (hovered.index == item.index)
+                val targetItem = if (endOffset > (hovered.offset + (hovered.size / 2))) {
+                    state.layoutInfo.visibleItemsInfo.firstOrNull { item ->
+                        (item.index > hovered.index) && (endOffset > (item.offset + (item.size / 2)))
                     }
-                    .firstOrNull { item ->
-                        val delta = startOffset - hovered.offset
-                        when {
-                            delta > 0 -> endOffset > item.offsetEnd
-                            else -> startOffset < item.offset
+                } else if (startOffset < hovered.offset) {
+                    state.layoutInfo.visibleItemsInfo.lastOrNull { item ->
+                        (item.index < hovered.index) && (startOffset < (item.offset + (item.size / 2)))
+                    }
+                } else null
+
+                targetItem?.let { item ->
+                    currentIndexOfDraggedItem?.let { current ->
+                        scope.launch {
+                            onSwap(current, item.index)
                         }
                     }
-                    ?.also { item ->
-                        currentIndexOfDraggedItem?.let { current ->
-                            scope.launch {
-                                onSwap(current, item.index)
-                            }
-                        }
-                        currentIndexOfDraggedItem = item.index
-                    }
+                    currentIndexOfDraggedItem = item.index
+                }
             }
         }
     }

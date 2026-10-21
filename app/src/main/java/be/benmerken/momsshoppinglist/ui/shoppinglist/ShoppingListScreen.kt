@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -119,48 +120,18 @@ fun ShoppingListScreen(
 
             LazyColumn(
                 state = listState,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .pointerInput(dragDropState) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = { offset ->
-                                dragDropState.onDragStart(offset)
-                            },
-                            onDrag = { change, offset ->
-                                change.consume()
-                                dragDropState.onDrag(offset)
-                                if (overscrollJob?.isActive == true) return@detectDragGesturesAfterLongPress
-                                dragDropState
-                                    .checkForOverScroll()
-                                    .takeIf { it != 0f }
-                                    ?.let {
-                                        overscrollJob = scope.launch {
-                                            listState.animateScrollBy(
-                                                it * 1.3f,
-                                                tween(easing = FastOutLinearInEasing)
-                                            )
-                                        }
-                                    } ?: run { overscrollJob?.cancel() }
-                            },
-                            onDragEnd = {
-                                dragDropState.onDragInterrupted()
-                                overscrollJob?.cancel()
-                            },
-                            onDragCancel = {
-                                dragDropState.onDragInterrupted()
-                                overscrollJob?.cancel()
-                            }
-                        )
-                    },
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 itemsIndexed(
                     items = items,
                     key = { _, item -> item.id }
                 ) { index, item ->
+                    val currentItemIndex by rememberUpdatedState(index)
+
                     DraggableItem(
                         dragDropState = dragDropState,
-                        index = index,
+                        index = currentItemIndex,
                         modifier = Modifier.fillMaxWidth()
                     ) { isDragging ->
                         ShoppingItemRow(
@@ -169,6 +140,37 @@ fun ShoppingListScreen(
                                 items = items.map {
                                     if (it.id == item.id) it.copy(isChecked = checked) else it
                                 }
+                            },
+                            dragHandleModifier = Modifier.pointerInput(item.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        dragDropState.onDragStartForIndex(currentItemIndex)
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        dragDropState.onDrag(dragAmount)
+                                        if (overscrollJob?.isActive == true) return@detectDragGesturesAfterLongPress
+                                        dragDropState
+                                            .checkForOverScroll()
+                                            .takeIf { it != 0f }
+                                            ?.let {
+                                                overscrollJob = scope.launch {
+                                                    listState.animateScrollBy(
+                                                        it * 1.3f,
+                                                        tween(easing = FastOutLinearInEasing)
+                                                    )
+                                                }
+                                            } ?: run { overscrollJob?.cancel() }
+                                    },
+                                    onDragEnd = {
+                                        dragDropState.onDragInterrupted()
+                                        overscrollJob?.cancel()
+                                    },
+                                    onDragCancel = {
+                                        dragDropState.onDragInterrupted()
+                                        overscrollJob?.cancel()
+                                    }
+                                )
                             },
                             modifier = Modifier.background(
                                 if (isDragging) {
