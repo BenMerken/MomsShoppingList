@@ -1,7 +1,10 @@
 package be.benmerken.momsshoppinglist.ui.shoppinglist
 
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -22,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -34,6 +39,10 @@ import be.benmerken.momsshoppinglist.data.model.ShoppingItem
 import be.benmerken.momsshoppinglist.data.model.ShoppingList
 import be.benmerken.momsshoppinglist.ui.components.ShoppingItemRow
 import be.benmerken.momsshoppinglist.ui.theme.MomsShoppingListTheme
+import be.benmerken.momsshoppinglist.ui.util.DraggableItem
+import be.benmerken.momsshoppinglist.ui.util.rememberDragDropState
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,7 +64,20 @@ fun ShoppingListScreen(
         )
     }
 
-    var draggingIndex by remember { mutableStateOf<Int?>(null) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    var overscrollJob by remember { mutableStateOf<Job?>(null) }
+
+    val dragDropState = rememberDragDropState(lazyListState = listState) { fromIndex, toIndex ->
+        if (fromIndex in items.indices && toIndex in items.indices) {
+            val mutableList = items.toMutableList()
+            val item = mutableList.removeAt(fromIndex)
+            mutableList.add(toIndex, item)
+            items = mutableList.mapIndexed { index, shoppingItem ->
+                shoppingItem.copy(listOrder = index)
+            }
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -96,77 +118,72 @@ fun ShoppingListScreen(
             )
 
             LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
+                state = listState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(dragDropState) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { offset ->
+                                dragDropState.onDragStart(offset)
+                            },
+                            onDrag = { change, offset ->
+                                change.consume()
+                                dragDropState.onDrag(offset)
+                                if (overscrollJob?.isActive == true) return@detectDragGesturesAfterLongPress
+                                dragDropState
+                                    .checkForOverScroll()
+                                    .takeIf { it != 0f }
+                                    ?.let {
+                                        overscrollJob = scope.launch {
+                                            listState.animateScrollBy(
+                                                it * 1.3f,
+                                                tween(easing = FastOutLinearInEasing)
+                                            )
+                                        }
+                                    } ?: run { overscrollJob?.cancel() }
+                            },
+                            onDragEnd = {
+                                dragDropState.onDragInterrupted()
+                                overscrollJob?.cancel()
+                            },
+                            onDragCancel = {
+                                dragDropState.onDragInterrupted()
+                                overscrollJob?.cancel()
+                            }
+                        )
+                    },
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 itemsIndexed(
                     items = items,
                     key = { _, item -> item.id }
                 ) { index, item ->
-                    var dragOffsetY by remember { mutableStateOf(0f) }
-
-                    ShoppingItemRow(
-                        item = item,
-                        onCheckedChange = { checked ->
-                            items = items.map {
-                                if (it.id == item.id) it.copy(isChecked = checked) else it
-                            }
-                        },
-                        modifier = Modifier.background(
-                            if (draggingIndex == index) {
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            } else {
-                                MaterialTheme.colorScheme.surface
-                            }
-                        ),
-                        dragHandleModifier = Modifier.pointerInput(index) {
-                            detectDragGestures(
-                                onDragStart = {
-                                    draggingIndex = index
-                                    dragOffsetY = 0f
-                                },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    dragOffsetY += dragAmount.y
-                                    val itemHeightPx = 100f // Threshold for reordering
-                                    if (dragOffsetY > itemHeightPx && index < items.size - 1) {
-                                        // Move down
-                                        val mutableList = items.toMutableList()
-                                        val movedItem = mutableList.removeAt(index)
-                                        mutableList.add(index + 1, movedItem)
-                                        items = mutableList.mapIndexed { newIndex, itm ->
-                                            itm.copy(listOrder = newIndex)
-                                        }
-                                        draggingIndex = index + 1
-                                        dragOffsetY = 0f
-                                    } else if (dragOffsetY < -itemHeightPx && index > 0) {
-                                        // Move up
-                                        val mutableList = items.toMutableList()
-                                        val movedItem = mutableList.removeAt(index)
-                                        mutableList.add(index - 1, movedItem)
-                                        items = mutableList.mapIndexed { newIndex, itm ->
-                                            itm.copy(listOrder = newIndex)
-                                        }
-                                        draggingIndex = index - 1
-                                        dragOffsetY = 0f
-                                    }
-                                },
-                                onDragEnd = {
-                                    draggingIndex = null
-                                    dragOffsetY = 0f
-                                },
-                                onDragCancel = {
-                                    draggingIndex = null
-                                    dragOffsetY = 0f
+                    DraggableItem(
+                        dragDropState = dragDropState,
+                        index = index,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { isDragging ->
+                        ShoppingItemRow(
+                            item = item,
+                            onCheckedChange = { checked ->
+                                items = items.map {
+                                    if (it.id == item.id) it.copy(isChecked = checked) else it
+                                }
+                            },
+                            modifier = Modifier.background(
+                                if (isDragging) {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                } else {
+                                    MaterialTheme.colorScheme.surface
                                 }
                             )
-                        }
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    )
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    }
                 }
             }
         }
